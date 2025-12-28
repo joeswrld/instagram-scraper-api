@@ -1,0 +1,23 @@
+# ============================================
+# docker-compose.yml
+# Docker Compose for easy deployment
+
+version: '3.8'
+
+services:
+  instagram-scraper:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    environment:
+      - DATA_DIR=/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
