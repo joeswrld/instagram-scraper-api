@@ -2,7 +2,7 @@
 Instagram Scraper API - Main FastAPI Application
 Production-ready public Instagram data scraper with local storage
 """
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, HttpUrl
@@ -37,6 +37,15 @@ app = FastAPI(
     title="Instagram Scraper API",
     description="Production-ready API for scraping public Instagram data",
     version="1.0.0"
+)
+
+# Configure CORS - Allow requests from web browsers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (for development)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Configuration

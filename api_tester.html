@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Scraper API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .section h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #495057;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .secondary-btn {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+
+        .response-area {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-queued { background: #ffc107; color: #000; }
+        .status-running { background: #17a2b8; color: #fff; }
+        .status-completed { background: #28a745; color: #fff; }
+        .status-failed { background: #dc3545; color: #fff; }
+
+        .job-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .job-card h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+
+        .error-box {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #c62828;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Instagram Scraper API Tester</h1>
+            <p>Test your Instagram Scraper API endpoints in real-time</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Configuration Section -->
+            <div class="section">
+                <h2>⚙️ API Configuration</h2>
+                
+                <div class="form-group">
+                    <label>API Base URL</label>
+                    <input type="text" id="apiUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+                </div>
+
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="apiKey" value="dev-key-12345" placeholder="your-api-key-here">
+                </div>
+
+                <button onclick="testConnection()">Test Connection</button>
+            </div>
+
+            <!-- Create Job Section -->
+            <div class="section">
+                <h2>📋 Create Scrape Job</h2>
+                
+                <div class="form-group">
+                    <label>Instagram URLs (one per line)</label>
+                    <textarea id="urls" placeholder="https://www.instagram.com/p/ABC123/
+https://www.instagram.com/natgeo/"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Scrape Type</label>
+                    <select id="scrapeType">
+                        <option value="post">Post</option>
+                        <option value="profile">Profile</option>
+                        <option value="hashtag">Hashtag</option>
+                        <option value="place">Place</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Export Format</label>
+                    <select id="exportFormat">
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="zip">ZIP</option>
+                    </select>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="includeMedia" checked>
+                        Include Media
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="includeComments" checked>
+                        Include Comments
+                    </label>
+                </div>
+
+                <button onclick="createJob()" style="margin-top: 20px;">🚀 Start Scraping</button>
+            </div>
+
+            <!-- Job Status Section -->
+            <div class="section full-width">
+                <h2>📊 Job Status</h2>
+                <div id="jobStatus">
+                    <p style="color: #6c757d;">No active job. Create a scrape job to get started.</p>
+                </div>
+            </div>
+
+            <!-- Response Section -->
+            <div class="section full-width">
+                <h2>📄 API Response</h2>
+                <div class="response-area" id="response">Waiting for API call...</div>
+            </div>
+
+            <!-- All Jobs Section -->
+            <div class="section full-width">
+                <h2>📑 All Jobs</h2>
+                <button onclick="listJobs()">Refresh Jobs List</button>
+                <div id="jobsList" style="margin-top: 20px;">
+                    <p style="color: #6c757d;">Click "Refresh Jobs List" to see all jobs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let statusInterval = null;
+
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value.replace(/\/$/, '');
+        }
+
+        function getApiKey() {
+            return document.getElementById('apiKey').value;
+        }
+
+        function displayResponse(data, isError = false) {
+            const responseEl = document.getElementById('response');
+            responseEl.textContent = JSON.stringify(data, null, 2);
+            responseEl.style.borderLeft = isError ? '4px solid #dc3545' : '4px solid #28a745';
+        }
+
+        async function testConnection() {
+            try {
+                displayResponse({ status: 'Testing connection...' });
+                
+                const response = await fetch(getApiUrl() + '/');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResponse({
+                        success: true,
+                        message: 'Connection successful!',
+                        data: data
+                    });
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch (error) {
+                displayResponse({
+                    success: false,
+                    error: error.message,
+                    hint: 'Make sure the API server is running on ' + getApiUrl()
+                }, true);
+            }
+        }
+
+        async function createJob() {
+            try {
+                const urls = document.getElementById('urls').value
+                    .split('\n')
+                    .map(u => u.trim())
+                    .filter(u => u.length > 0);
+
+                if (urls.length === 0) {
+                    alert('Please enter at least one Instagram URL');
+                    return;
+                }
+
+                const payload = {
+                    urls: urls,
+                    scrape_type: document.getElementById('scrapeType').value,
+                    export_format: document.getElementById('exportFormat').value,
+                    include_media: document.getElementById('includeMedia').checked,
+                    include_comments: document.getElementById('includeComments').checked
+                };
+
+                displayResponse({ status: 'Creating job...', payload: payload });
+
+                const response = await fetch(getApiUrl() + '/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': getApiKey()
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    displayResponse({
+                        success: true,
+                        message: 'Job created successfully!',
+                        data: data
+                    });
+                    
+                    // Start monitoring job status
+                    startStatusMonitoring();
+                } else {
+                    throw new Error(data.detail || 'Failed to create job');
+                }
+            } catch (error) {
+                displayResponse({
+                    success: false,
+                    error: error.message
+                }, true);
+            }
+        }
+
+        async function checkJobStatus(jobId = currentJobId) {
+            if (!jobId) return;
+
+            try {
+                const response = await fetch(getApiUrl() + `/scrape/${jobId}`, {
+                    headers: {
+                        'X-API-Key': getApiKey()
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    updateJobStatusDisplay(data);
+                    
+                    // Stop monitoring if job is complete or failed
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        stopStatusMonitoring();
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking job status:', error);
+            }
+        }
+
+        function updateJobStatusDisplay(job) {
+            const statusEl = document.getElementById('jobStatus');
+            const percentage = job.progress.percentage.toFixed(1);
+            
+            statusEl.innerHTML = `
+                <div class="job-card">
+                    <h3>Job ID: ${job.job_id}</h3>
+                    <p>Status: <span class="status-badge status-${job.status}">${job.status.toUpperCase()}</span></p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <p style="margin-top: 10px;">
+                        Progress: ${job.progress.completed} / ${job.progress.total} (${percentage}%)
+                    </p>
+                    <p style="font-size: 0.85em; color: #6c757d; margin-top: 5px;">
+                        Created: ${new Date(job.created_at).toLocaleString()}
+                    </p>
+                    ${job.error ? `<div class="error-box" style="margin-top: 10px;">Error: ${job.error}</div>` : ''}
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button onclick="checkJobStatus('${job.job_id}')" style="flex: 1;">Refresh Status</button>
+                        ${job.status === 'completed' ? `<button onclick="downloadResults('${job.job_id}')" style="flex: 1;">Download Results</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function startStatusMonitoring() {
+            stopStatusMonitoring();
+            statusInterval = setInterval(() => {
+                checkJobStatus();
+            }, 3000);
+        }
+
+        function stopStatusMonitoring() {
+            if (statusInterval) {
+                clearInterval(statusInterval);
+                statusInterval = null;
+            }
+        }
+
+        async function downloadResults(jobId) {
+            try {
+                const format = document.getElementById('exportFormat').value;
+                const url = `${getApiUrl()}/scrape/${jobId}/results?format=${format}`;
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'X-API-Key': getApiKey()
+                    }
+                });
+
+                if (response.ok) {
+                    if (format === 'json') {
+                        const data = await response.json();
+                        displayResponse({
+                            success: true,
+                            message: 'Results retrieved successfully!',
+                            count: data.length,
+                            data: data
+                        });
+                    } else {
+                        // Download file
+                        const blob = await response.blob();
+                        const downloadUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = `results_${jobId}.${format}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+                        
+                        displayResponse({
+                            success: true,
+                            message: `File downloaded: results_${jobId}.${format}`
+                        });
+                    }
+                } else {
+                    throw new Error('Failed to download results');
+                }
+            } catch (error) {
+                displayResponse({
+                    success: false,
+                    error: error.message
+                }, true);
+            }
+        }
+
+        async function listJobs() {
+            try {
+                displayResponse({ status: 'Fetching jobs...' });
+                
+                const response = await fetch(getApiUrl() + '/jobs?limit=20', {
+                    headers: {
+                        'X-API-Key': getApiKey()
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResponse({
+                        success: true,
+                        message: 'Jobs retrieved successfully!',
+                        data: data
+                    });
+
+                    const jobsListEl = document.getElementById('jobsList');
+                    if (data.jobs.length === 0) {
+                        jobsListEl.innerHTML = '<p style="color: #6c757d;">No jobs found</p>';
+                    } else {
+                        jobsListEl.innerHTML = data.jobs.map(job => `
+                            <div class="job-card">
+                                <h3>Job ID: ${job.job_id}</h3>
+                                <p>Status: <span class="status-badge status-${job.status}">${job.status.toUpperCase()}</span></p>
+                                <p style="font-size: 0.85em; color: #6c757d;">
+                                    Created: ${new Date(job.created_at).toLocaleString()}
+                                </p>
+                                <p style="font-size: 0.85em; color: #6c757d;">
+                                    Items: ${job.completed_items} / ${job.total_items}
+                                </p>
+                                <button onclick="currentJobId='${job.job_id}'; checkJobStatus('${job.job_id}')" style="margin-top: 10px;">
+                                    View Details
+                                </button>
+                            </div>
+                        `).join('');
+                    }
+                } else {
+                    throw new Error(data.detail || 'Failed to fetch jobs');
+                }
+            } catch (error) {
+                displayResponse({
+                    success: false,
+                    error: error.message
+                }, true);
+            }
+        }
+
+        // Auto-test connection on load
+        window.addEventListener('load', () => {
+            testConnection();
+        });
+    </script>
+</body>
+</html>

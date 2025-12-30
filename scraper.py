@@ -9,7 +9,6 @@ from typing import List, Dict, Any, Callable, Optional
 from datetime import datetime
 import re
 from pathlib import Path
-import aiohttp
 import instaloader
 from urllib.parse import urlparse
 
