@@ -1,16 +1,13 @@
 """
-Instagram Scraper API - Main FastAPI Application
-Production-ready public Instagram data scraper with local storage
-NOW WITH USAGE-BASED BILLING
+Instagram Scraper API - Main FastAPI Application - FIXED
 """
 
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from enum import Enum
-import asyncio
 import hashlib
 import json
 import logging
@@ -19,30 +16,25 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Import scraper modules
 from scraper import InstagramScraper
 from storage import StorageManager
 from job_manager import JobManager, JobStatus
-from usage_tracker import UsageTracker, PricingTiers  # NEW: Import usage tracking
+from usage_tracker import UsageTracker, PricingTiers
 
-# Initialize FastAPI
 app = FastAPI(
     title="Instagram Scraper API",
     description="Production-ready API for scraping public Instagram data with usage-based billing",
     version="1.0.0"
 )
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,16 +43,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuration
 API_KEYS = set(os.getenv("API_KEYS", "dev-key-12345").split(","))
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
 DATA_DIR.mkdir(exist_ok=True)
 
-# Global instances
 storage_manager = StorageManager(DATA_DIR)
 job_manager = JobManager()
 scraper = InstagramScraper(storage_manager)
-usage_tracker = UsageTracker(DATA_DIR)  # NEW: Initialize usage tracker
+usage_tracker = UsageTracker(DATA_DIR)
 
 # Models
 class ScrapeType(str, Enum):
@@ -69,12 +59,10 @@ class ScrapeType(str, Enum):
     HASHTAG = "hashtag"
     PLACE = "place"
 
-
 class ExportFormat(str, Enum):
     JSON = "json"
     CSV = "csv"
     ZIP = "zip"
-
 
 class ScrapeRequest(BaseModel):
     urls: List[str]
@@ -83,14 +71,12 @@ class ScrapeRequest(BaseModel):
     include_media: bool = True
     include_comments: bool = True
 
-
 class ScrapeResponse(BaseModel):
     job_id: str
     status: str
     message: str
-    estimated_cost: Optional[float] = None  # NEW: Show estimated cost
-    pricing_info: Optional[Dict[str, Any]] = None  # NEW: Pricing details
-
+    estimated_cost: Optional[float] = None
+    pricing_info: Optional[Dict[str, Any]] = None
 
 class JobStatusResponse(BaseModel):
     job_id: str
@@ -99,31 +85,29 @@ class JobStatusResponse(BaseModel):
     updated_at: str
     progress: Dict[str, Any]
     error: Optional[str] = None
-    cost_info: Optional[Dict[str, Any]] = None  # NEW: Cost information
+    cost_info: Optional[Dict[str, Any]] = None
 
-
-# NEW: Account creation model
 class AccountCreateRequest(BaseModel):
     email: str
     api_keys: List[str]
     pricing_tier: str = "professional"
     spending_limit: Optional[float] = None
 
+class PricingEstimateRequest(BaseModel):
+    num_posts: int
+    include_comments: bool = False
+    include_media: bool = False
 
-# Authentication
 async def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key not in API_KEYS:
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    # NEW: Check if user account exists and is active
     user_account = usage_tracker.get_user_from_api_key(x_api_key)
     if user_account and not user_account.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
     
     return x_api_key
 
-
-# Endpoints
 @app.get("/")
 async def root():
     return {
@@ -134,34 +118,28 @@ async def root():
         "pricing_tiers": list(PricingTiers.TIERS.keys())
     }
 
-
 @app.post("/scrape", response_model=ScrapeResponse)
 async def create_scrape_job(
     request: ScrapeRequest,
     background_tasks: BackgroundTasks,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Create a new scraping job with cost estimation
-    """
     try:
-        # NEW: Get user account for pricing
         user_account = usage_tracker.get_user_from_api_key(x_api_key)
         
-        # NEW: Calculate estimated cost
         estimated_cost = 0.0
         if user_account:
-            estimated_cost = PricingTiers.calculate_cost(
+            cost_breakdown = PricingTiers.calculate_cost(
                 num_posts=len(request.urls),
                 tier=user_account.pricing_tier,
                 include_comments=request.include_comments,
                 include_media=request.include_media,
-                total_monthly_posts=user_account.current_month_posts
+                current_month_posts=user_account.current_month_posts
             )
+            estimated_cost = cost_breakdown["overage"]
             
-            # NEW: Check spending limit before creating job
             if user_account.spending_limit:
-                projected_cost = user_account.current_month_cost + estimated_cost
+                projected_cost = user_account.current_month_cost + cost_breakdown["overage"]
                 if projected_cost > user_account.spending_limit:
                     raise HTTPException(
                         status_code=402,
@@ -169,20 +147,17 @@ async def create_scrape_job(
                             "error": "Spending limit would be exceeded",
                             "current_spending": user_account.current_month_cost,
                             "spending_limit": user_account.spending_limit,
-                            "estimated_job_cost": estimated_cost,
+                            "estimated_job_cost": cost_breakdown["overage"],
                             "projected_total": projected_cost
                         }
                     )
         
-        # Generate job ID
         job_id = hashlib.md5(
             f"{datetime.now().isoformat()}{request.urls}".encode()
         ).hexdigest()[:16]
         
-        # Initialize storage
         storage_manager.init_job_storage(job_id, request.export_format.value)
         
-        # Create job
         job = job_manager.create_job(
             job_id=job_id,
             urls=request.urls,
@@ -192,17 +167,15 @@ async def create_scrape_job(
             include_comments=request.include_comments
         )
         
-        # Start scraping in background
         background_tasks.add_task(
             run_scrape_job,
             job_id=job_id,
             config=request.dict(),
-            api_key=x_api_key  # NEW: Pass API key for usage tracking
+            api_key=x_api_key
         )
         
         logger.info(f"Created scrape job: {job_id} (estimated cost: ${estimated_cost:.4f})")
         
-        # NEW: Build pricing info response
         pricing_info = None
         if user_account:
             pricing_info = {
@@ -225,26 +198,21 @@ async def create_scrape_job(
         raise
     except Exception as e:
         logger.error(f"Error creating scrape job: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/scrape/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(job_id: str, x_api_key: str = Depends(verify_api_key)):
-    """
-    Get the status of a scraping job with cost information
-    """
     job = job_manager.get_job(job_id)
     
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # NEW: Get cost information if job is completed
     cost_info = None
     if job.status == JobStatus.COMPLETED:
-        # Try to find usage record for this job
         user_account = usage_tracker.get_user_from_api_key(x_api_key)
         if user_account:
-            # Read usage file to find this job's cost
             month_key = datetime.now().strftime("%Y-%m")
             usage_file = usage_tracker.usage_dir / f"usage_{month_key}.jsonl"
             
@@ -275,9 +243,8 @@ async def get_job_status(job_id: str, x_api_key: str = Depends(verify_api_key)):
             "percentage": (job.completed_items / job.total_items * 100) if job.total_items > 0 else 0
         },
         error=job.error,
-        cost_info=cost_info  # NEW: Include cost information
+        cost_info=cost_info
     )
-
 
 @app.get("/scrape/{job_id}/results")
 async def get_job_results(
@@ -285,9 +252,6 @@ async def get_job_results(
     format: ExportFormat = ExportFormat.JSON,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Get the results of a completed scraping job
-    """
     job = job_manager.get_job(job_id)
     
     if not job:
@@ -324,16 +288,12 @@ async def get_job_results(
         logger.error(f"Error retrieving results for job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/jobs")
 async def list_jobs(
     status: Optional[JobStatus] = None,
     limit: int = 50,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    List all scraping jobs with optional status filter
-    """
     jobs = job_manager.list_jobs(status=status, limit=limit)
     
     return {
@@ -350,12 +310,8 @@ async def list_jobs(
         ]
     }
 
-
 @app.delete("/scrape/{job_id}")
 async def delete_job(job_id: str, x_api_key: str = Depends(verify_api_key)):
-    """
-    Delete a job and its associated data
-    """
     job = job_manager.get_job(job_id)
     
     if not job:
@@ -371,16 +327,8 @@ async def delete_job(job_id: str, x_api_key: str = Depends(verify_api_key)):
         logger.error(f"Error deleting job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ============================================
-# NEW: USAGE & BILLING ENDPOINTS
-# ============================================
-
 @app.get("/usage/summary")
 async def get_usage_summary(x_api_key: str = Depends(verify_api_key)):
-    """
-    Get current usage and billing summary
-    """
     summary = usage_tracker.get_account_summary(x_api_key)
     
     if not summary:
@@ -391,16 +339,12 @@ async def get_usage_summary(x_api_key: str = Depends(verify_api_key)):
     
     return summary
 
-
 @app.get("/usage/history/{year}/{month}")
 async def get_usage_history(
     year: int,
     month: int,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Get detailed usage history for a specific month
-    """
     user_account = usage_tracker.get_user_from_api_key(x_api_key)
     
     if not user_account:
@@ -409,16 +353,12 @@ async def get_usage_history(
     history = usage_tracker.get_monthly_usage(user_account.user_id, year, month)
     return history
 
-
 @app.get("/usage/invoice/{year}/{month}")
 async def get_invoice(
     year: int,
     month: int,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Generate invoice for a specific month
-    """
     user_account = usage_tracker.get_user_from_api_key(x_api_key)
     
     if not user_account:
@@ -431,29 +371,19 @@ async def get_invoice(
     
     return invoice
 
-
 @app.get("/pricing/tiers")
 async def get_pricing_tiers():
-    """
-    Get all available pricing tiers
-    """
     return {
         "tiers": PricingTiers.TIERS,
         "multipliers": PricingTiers.MULTIPLIERS,
         "volume_discounts": PricingTiers.VOLUME_DISCOUNTS
     }
 
-
 @app.post("/pricing/estimate")
 async def estimate_cost(
-    num_posts: int,
-    include_comments: bool = False,
-    include_media: bool = False,
+    request: PricingEstimateRequest,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Estimate cost for a scraping job
-    """
     user_account = usage_tracker.get_user_from_api_key(x_api_key)
     
     tier = "professional"
@@ -463,35 +393,31 @@ async def estimate_cost(
         tier = user_account.pricing_tier
         current_monthly_posts = user_account.current_month_posts
     
-    cost = PricingTiers.calculate_cost(
-        num_posts=num_posts,
+    cost_breakdown = PricingTiers.calculate_cost(
+        num_posts=request.num_posts,
         tier=tier,
-        include_comments=include_comments,
-        include_media=include_media,
-        total_monthly_posts=current_monthly_posts
+        include_comments=request.include_comments,
+        include_media=request.include_media,
+        current_month_posts=current_monthly_posts
     )
     
     tier_info = PricingTiers.TIERS[tier]
     
     return {
-        "estimated_cost": cost,
-        "cost_per_post": cost / num_posts if num_posts > 0 else 0,
+        "estimated_cost": cost_breakdown["overage"],
+        "cost_per_post": cost_breakdown["overage"] / request.num_posts if request.num_posts > 0 else 0,
         "pricing_tier": tier,
         "base_rate": tier_info["base_price"],
         "multipliers_applied": {
-            "comments": include_comments,
-            "media": include_media
+            "comments": request.include_comments,
+            "media": request.include_media
         },
         "current_month_posts": current_monthly_posts,
-        "volume_discount_eligible": current_monthly_posts + num_posts >= 50000
+        "volume_discount_eligible": current_monthly_posts + request.num_posts >= 50000
     }
-
 
 @app.post("/account/create")
 async def create_account(request: AccountCreateRequest):
-    """
-    Create a new user account (Admin only - add authentication in production)
-    """
     try:
         account = usage_tracker.create_account(
             email=request.email,
@@ -512,15 +438,11 @@ async def create_account(request: AccountCreateRequest):
         logger.error(f"Error creating account: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/account/add-credits")
 async def add_credits(
     amount: float,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Add prepaid credits to account
-    """
     user_account = usage_tracker.get_user_from_api_key(x_api_key)
     
     if not user_account:
@@ -537,15 +459,11 @@ async def add_credits(
         "new_balance": user_account.credits_balance + amount
     }
 
-
 @app.post("/account/upgrade")
 async def upgrade_account(
     new_tier: str,
     x_api_key: str = Depends(verify_api_key)
 ):
-    """
-    Upgrade/downgrade pricing tier
-    """
     if new_tier not in PricingTiers.TIERS:
         raise HTTPException(
             status_code=400,
@@ -567,17 +485,11 @@ async def upgrade_account(
         "new_rate": PricingTiers.TIERS[new_tier]["base_price"]
     }
 
-
-# Background task (updated with usage tracking)
 async def run_scrape_job(job_id: str, config: Dict[str, Any], api_key: str):
-    """
-    Execute scraping job in background with usage tracking
-    """
     try:
         job_manager.update_job_status(job_id, JobStatus.RUNNING)
         logger.info(f"Starting scrape job: {job_id}")
         
-        # Run scraper
         await scraper.scrape_batch(
             job_id=job_id,
             urls=config['urls'],
@@ -589,29 +501,24 @@ async def run_scrape_job(job_id: str, config: Dict[str, Any], api_key: str):
             )
         )
         
-        # Finalize export
         logger.info(f"Finalizing export for job {job_id}")
         export_file = storage_manager.finalize_export(job_id)
         
         if export_file:
             logger.info(f"Export finalized: {export_file}")
         
-        # NEW: Record usage and calculate actual cost
         try:
-            # Calculate storage used
             job_dir = storage_manager.get_job_dir(job_id)
             storage_used_mb = sum(
                 f.stat().st_size for f in job_dir.rglob('*') if f.is_file()
             ) / (1024 * 1024)
             
-            # Count actual posts scraped (from results file)
             results_file = job_dir / "results.jsonl"
             actual_posts = 0
             if results_file.exists():
                 with open(results_file, 'r') as f:
                     actual_posts = sum(1 for line in f if line.strip())
             
-            # Record usage
             usage_record = usage_tracker.record_usage(
                 api_key=api_key,
                 job_id=job_id,
@@ -628,7 +535,6 @@ async def run_scrape_job(job_id: str, config: Dict[str, Any], api_key: str):
         
         except Exception as e:
             logger.error(f"Error recording usage for job {job_id}: {str(e)}")
-            # Don't fail the job if usage tracking fails
         
         job_manager.update_job_status(job_id, JobStatus.COMPLETED)
         logger.info(f"Completed scrape job: {job_id}")
@@ -636,7 +542,6 @@ async def run_scrape_job(job_id: str, config: Dict[str, Any], api_key: str):
     except Exception as e:
         logger.error(f"Error in scrape job {job_id}: {str(e)}")
         job_manager.update_job_status(job_id, JobStatus.FAILED, error=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
