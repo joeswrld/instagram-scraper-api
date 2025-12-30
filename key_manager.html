@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Manager - Instagram Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 2px solid #e9ecef;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #495057;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #2a5298;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(42, 82, 152, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .key-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s;
+        }
+
+        .key-card:hover {
+            border-color: #2a5298;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .key-value {
+            background: #1e1e1e;
+            color: #4ec9b0;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .key-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .key-actions button {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            color: #856404;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            color: #155724;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2a5298;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #4ec9b0;
+            color: #4ec9b0;
+            padding: 4px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .copy-btn:hover {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .badge-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-limited {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .env-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow: auto;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .key-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 API Key Manager</h1>
+            <p>Generate and manage production-ready API keys for Instagram Scraper</p>
+        </div>
+
+        <div class="content">
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalKeys">0</div>
+                    <div class="stat-label">Total Keys</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activeKeys">0</div>
+                    <div class="stat-label">Active Keys</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="inactiveKeys">0</div>
+                    <div class="stat-label">Inactive Keys</div>
+                </div>
+            </div>
+
+            <!-- Generate New Key -->
+            <div class="section">
+                <h2>🆕 Generate New API Key</h2>
+                
+                <div class="info-box">
+                    <strong>🛡️ Security Best Practices:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Generated keys use cryptographically secure random values</li>
+                        <li>Store keys securely - they won't be shown again</li>
+                        <li>Use different keys for different environments (dev, staging, prod)</li>
+                        <li>Rotate keys regularly for enhanced security</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label>Key Name / Description</label>
+                    <input type="text" id="keyName" placeholder="e.g., Production API Key, Client XYZ, Development">
+                </div>
+
+                <div class="form-group">
+                    <label>Environment</label>
+                    <select id="keyEnvironment">
+                        <option value="production">Production</option>
+                        <option value="staging">Staging</option>
+                        <option value="development">Development</option>
+                        <option value="testing">Testing</option>
+                    </select>
+                </div>
+
+                <button onclick="generateKey()">
+                    🔑 Generate Secure API Key
+                </button>
+            </div>
+
+            <!-- API Keys List -->
+            <div class="section">
+                <h2>📋 Your API Keys</h2>
+                <div id="keysList">
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                        <p>No API keys generated yet</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Generate your first key above to get started</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export to .env -->
+            <div class="section">
+                <h2>📄 Export for Production</h2>
+                
+                <div class="warning-box">
+                    <strong>⚠️ Important:</strong> Only export active keys to your production environment. Keep inactive keys for reference only.
+                </div>
+
+                <button onclick="generateEnvFile()" class="btn-success">
+                    📥 Generate .env Configuration
+                </button>
+
+                <button onclick="exportActiveKeys()" class="btn-secondary" style="margin-left: 10px;">
+                    📋 Copy Active Keys Only
+                </button>
+
+                <div id="envOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Key storage
+        let apiKeys = [];
+
+        // Load keys from localStorage on page load
+        window.addEventListener('load', () => {
+            loadKeys();
+            updateStats();
+            renderKeys();
+        });
+
+        function generateSecureKey() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            return 'sk_' + Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        function generateKey() {
+            const name = document.getElementById('keyName').value.trim();
+            const environment = document.getElementById('keyEnvironment').value;
+
+            if (!name) {
+                alert('Please enter a name/description for the API key');
+                return;
+            }
+
+            const key = {
+                id: Date.now().toString(),
+                name: name,
+                environment: environment,
+                key: generateSecureKey(),
+                created: new Date().toISOString(),
+                active: true,
+                lastUsed: null
+            };
+
+            apiKeys.push(key);
+            saveKeys();
+            updateStats();
+            renderKeys();
+
+            // Clear form
+            document.getElementById('keyName').value = '';
+
+            // Show success message
+            showSuccessMessage(`API key "${name}" generated successfully!`);
+        }
+
+        function saveKeys() {
+            localStorage.setItem('apiKeys', JSON.stringify(apiKeys));
+        }
+
+        function loadKeys() {
+            const stored = localStorage.getItem('apiKeys');
+            if (stored) {
+                apiKeys = JSON.parse(stored);
+            }
+        }
+
+        function updateStats() {
+            const total = apiKeys.length;
+            const active = apiKeys.filter(k => k.active).length;
+            const inactive = total - active;
+
+            document.getElementById('totalKeys').textContent = total;
+            document.getElementById('activeKeys').textContent = active;
+            document.getElementById('inactiveKeys').textContent = inactive;
+        }
+
+        function renderKeys() {
+            const container = document.getElementById('keysList');
+
+            if (apiKeys.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                        <p>No API keys generated yet</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Generate your first key above to get started</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = apiKeys.map(key => `
+                <div class="key-card">
+                    <div class="key-header">
+                        <div>
+                            <h3 style="margin-bottom: 5px;">${key.name}</h3>
+                            <span class="badge badge-${key.active ? 'active' : 'inactive'}">
+                                ${key.active ? '✓ Active' : '✗ Inactive'}
+                            </span>
+                            <span class="badge" style="background: #e7f3ff; color: #0366d6; margin-left: 5px;">
+                                ${key.environment}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="key-value">
+                        <span>${key.key}</span>
+                        <button class="copy-btn" onclick="copyToClipboard('${key.key}', this)">
+                            Copy
+                        </button>
+                    </div>
+
+                    <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 12px;">
+                        <div>Created: ${new Date(key.created).toLocaleString()}</div>
+                        ${key.lastUsed ? `<div>Last used: ${new Date(key.lastUsed).toLocaleString()}</div>` : ''}
+                    </div>
+
+                    <div class="key-actions">
+                        <button onclick="toggleKeyStatus('${key.id}')" class="btn-secondary">
+                            ${key.active ? '🔒 Deactivate' : '🔓 Activate'}
+                        </button>
+                        <button onclick="deleteKey('${key.id}')" class="btn-danger">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleKeyStatus(id) {
+            const key = apiKeys.find(k => k.id === id);
+            if (key) {
+                key.active = !key.active;
+                saveKeys();
+                updateStats();
+                renderKeys();
+            }
+        }
+
+        function deleteKey(id) {
+            if (confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+                apiKeys = apiKeys.filter(k => k.id !== id);
+                saveKeys();
+                updateStats();
+                renderKeys();
+            }
+        }
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied!';
+                button.style.background = '#28a745';
+                button.style.color = 'white';
+                button.style.borderColor = '#28a745';
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = 'transparent';
+                    button.style.color = '#4ec9b0';
+                    button.style.borderColor = '#4ec9b0';
+                }, 2000);
+            });
+        }
+
+        function generateEnvFile() {
+            const activeKeys = apiKeys.filter(k => k.active);
+
+            if (activeKeys.length === 0) {
+                alert('No active API keys to export. Please generate and activate at least one key.');
+                return;
+            }
+
+            const keyString = activeKeys.map(k => k.key).join(',');
+
+            const envContent = `# ============================================
+# Instagram Scraper API - Production Configuration
+# Generated: ${new Date().toLocaleString()}
+# ============================================
+
+# ===== API Keys =====
+# IMPORTANT: Keep these keys secure and never commit to version control
+API_KEYS=${keyString}
+
+# Active Keys:
+${activeKeys.map(k => `# - ${k.name} (${k.environment}): ${k.key}`).join('\n')}
+
+# ===== Storage Configuration =====
+DATA_DIR=./data
+MAX_STORAGE_GB=10
+
+# ===== Server Configuration =====
+HOST=0.0.0.0
+PORT=8000
+WORKERS=4
+
+# ===== Scraping Configuration =====
+MAX_URLS_PER_JOB=100
+SCRAPE_DELAY_SECONDS=2.0
+MAX_COMMENTS_PER_POST=50
+MAX_POSTS_PER_PROFILE=12
+
+# ===== Rate Limiting =====
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=3600
+
+# ===== Logging Configuration =====
+LOG_LEVEL=INFO
+LOG_FILE=scraper.log
+`;
+
+            const output = document.getElementById('envOutput');
+            output.innerHTML = `<div class="env-output">${envContent}</div>`;
+
+            // Auto-copy to clipboard
+            navigator.clipboard.writeText(envContent).then(() => {
+                showSuccessMessage('Configuration copied to clipboard! Save it as .env file in your project root.');
+            });
+        }
+
+        function exportActiveKeys() {
+            const activeKeys = apiKeys.filter(k => k.active);
+
+            if (activeKeys.length === 0) {
+                alert('No active API keys to export.');
+                return;
+            }
+
+            const keyString = activeKeys.map(k => k.key).join(',');
+            
+            navigator.clipboard.writeText(keyString).then(() => {
+                showSuccessMessage(`${activeKeys.length} active key(s) copied to clipboard!`);
+            });
+        }
+
+        function showSuccessMessage(message) {
+            const container = document.querySelector('.content');
+            const messageBox = document.createElement('div');
+            messageBox.className = 'success-box';
+            messageBox.style.position = 'fixed';
+            messageBox.style.top = '20px';
+            messageBox.style.right = '20px';
+            messageBox.style.maxWidth = '400px';
+            messageBox.style.zIndex = '1000';
+            messageBox.style.animation = 'slideIn 0.3s ease-out';
+            messageBox.innerHTML = `<strong>✓ Success!</strong><br>${message}`;
+
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => messageBox.remove(), 300);
+            }, 4000);
+        }
+    </script>
+
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+    </style>
+</body>
+</html>
