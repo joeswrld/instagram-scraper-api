@@ -6,7 +6,7 @@ Initialize user accounts with API keys from your key manager
 
 import sys
 from pathlib import Path
-from usage_tracker import UsageTracker
+from usage_tracker import UsageTracker, PricingTiers
 
 def setup_accounts():
     """
@@ -87,6 +87,9 @@ def setup_accounts():
             spending_limit=spending_limit
         )
         
+        # Get tier info - FIXED: Use PricingTiers instead of usage_tracker.pricing_tiers
+        tier_info = PricingTiers.TIERS[account.pricing_tier]
+        
         print()
         print("✅ Account created successfully!")
         print()
@@ -96,7 +99,9 @@ def setup_accounts():
         print(f"User ID:       {account.user_id}")
         print(f"Email:         {account.email}")
         print(f"Pricing Tier:  {account.pricing_tier.upper()}")
-        print(f"Base Rate:     ${account.pricing_tier and UsageTracker.pricing_tiers.TIERS[account.pricing_tier]['base_price']}/post")
+        print(f"Base Rate:     ${tier_info['base_price']}/post")
+        print(f"Monthly Cost:  ${tier_info['monthly_cost']}/month")
+        print(f"Included:      {tier_info['included_posts']:,} posts/month FREE")
         print(f"API Keys:      {len(account.api_keys)} key(s)")
         
         for i, key in enumerate(account.api_keys, 1):
@@ -122,6 +127,8 @@ def setup_accounts():
         
     except Exception as e:
         print(f"❌ Error creating account: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return
 
 
@@ -143,13 +150,17 @@ def list_accounts():
     print()
     
     for user_id, account in usage_tracker.accounts.items():
+        tier_info = PricingTiers.TIERS.get(account.pricing_tier, {})
+        
         print(f"User ID:     {user_id}")
         print(f"Email:       {account.email}")
-        print(f"Tier:        {account.pricing_tier}")
+        print(f"Tier:        {account.pricing_tier.upper()}")
+        print(f"Monthly:     ${tier_info.get('monthly_cost', 0):.2f}/mo")
+        print(f"Included:    {tier_info.get('included_posts', 0):,} posts/mo")
         print(f"API Keys:    {len(account.api_keys)}")
-        print(f"Total Posts: {account.total_posts_scraped}")
+        print(f"Total Posts: {account.total_posts_scraped:,}")
         print(f"Total Spent: ${account.total_spent:.2f}")
-        print(f"This Month:  {account.current_month_posts} posts, ${account.current_month_cost:.2f}")
+        print(f"This Month:  {account.current_month_posts:,} posts, ${account.current_month_cost:.2f}")
         print(f"Credits:     ${account.credits_balance:.2f}")
         print(f"Active:      {account.is_active}")
         print("-" * 60)
