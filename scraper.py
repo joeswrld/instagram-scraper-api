@@ -61,6 +61,14 @@ class InstagramScraper:
                 )
                 
                 if data:
+                    # Download media files if requested
+                    if include_media and 'media' in data:
+                        data['media'] = await self._download_media_files(
+                            job_id=job_id,
+                            media_list=data['media'],
+                            post_id=data.get('shortcode', data.get('username', 'unknown'))
+                        )
+                    
                     # Save to storage
                     self.storage_manager.save_scraped_data(job_id, data)
                     results.append(data)
@@ -339,3 +347,51 @@ class InstagramScraper:
             "scraped_at": datetime.now().isoformat(),
             "note": "Place scraping requires additional implementation"
         }
+    
+    async def _download_media_files(
+        self,
+        job_id: str,
+        media_list: List[Dict[str, str]],
+        post_id: str
+    ) -> List[Dict[str, str]]:
+        """
+        Download media files and update URLs with local paths
+        """
+        import aiohttp
+        
+        updated_media = []
+        
+        for idx, media_item in enumerate(media_list):
+            try:
+                media_url = media_item.get('url')
+                media_type = media_item.get('type', 'image')
+                
+                if not media_url:
+                    updated_media.append(media_item)
+                    continue
+                
+                # Generate filename
+                extension = 'mp4' if media_type == 'video' else 'jpg'
+                filename = f"{post_id}_{idx + 1}.{extension}"
+                
+                # Download file
+                local_path = await self.storage_manager.download_media(
+                    job_id=job_id,
+                    media_url=media_url,
+                    filename=filename
+                )
+                
+                # Update media item with local path
+                media_item['local_path'] = str(local_path.relative_to(self.storage_manager.get_job_dir(job_id)))
+                media_item['downloaded'] = True
+                
+                logger.info(f"Downloaded {media_type}: {filename}")
+                
+            except Exception as e:
+                logger.error(f"Error downloading media {idx}: {str(e)}")
+                media_item['download_error'] = str(e)
+                media_item['downloaded'] = False
+            
+            updated_media.append(media_item)
+        
+        return updated_media

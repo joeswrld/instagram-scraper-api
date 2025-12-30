@@ -2,9 +2,10 @@
 Instagram Scraper API - Main FastAPI Application
 Production-ready public Instagram data scraper with local storage
 """
-from fastapi.middleware.cors import CORSMiddleware
+
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional, Dict, Any
 from enum import Enum
@@ -127,6 +128,9 @@ async def create_scrape_job(
             f"{datetime.now().isoformat()}{request.urls}".encode()
         ).hexdigest()[:16]
         
+        # Initialize storage with format preference
+        storage_manager.init_job_storage(job_id, request.export_format.value)
+        
         # Create job
         job = job_manager.create_job(
             job_id=job_id,
@@ -144,12 +148,12 @@ async def create_scrape_job(
             config=request.dict()
         )
         
-        logger.info(f"Created scrape job: {job_id}")
+        logger.info(f"Created scrape job: {job_id} with format: {request.export_format.value}")
         
         return ScrapeResponse(
             job_id=job_id,
             status=job.status.value,
-            message=f"Scrape job created successfully. Processing {len(request.urls)} URL(s)"
+            message=f"Scrape job created successfully. Processing {len(request.urls)} URL(s). Export format: {request.export_format.value.upper()}"
         )
     
     except Exception as e:
@@ -292,8 +296,12 @@ async def run_scrape_job(job_id: str, config: Dict[str, Any]):
             )
         )
         
-        # Export results
-        storage_manager.export_results(job_id, config['export_format'])
+        # Finalize export in user's requested format
+        logger.info(f"Finalizing export for job {job_id} in format: {config['export_format']}")
+        export_file = storage_manager.finalize_export(job_id)
+        
+        if export_file:
+            logger.info(f"Export finalized: {export_file}")
         
         job_manager.update_job_status(job_id, JobStatus.COMPLETED)
         logger.info(f"Completed scrape job: {job_id}")

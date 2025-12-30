@@ -40,18 +40,33 @@ class StorageManager:
         job_dir.mkdir(exist_ok=True)
         return job_dir
     
+    def init_job_storage(self, job_id: str, export_format: str) -> None:
+        """
+        Initialize job storage with format information
+        """
+        job_dir = self.get_job_dir(job_id)
+        
+        # Store format preference
+        format_file = job_dir / "format.txt"
+        with open(format_file, 'w') as f:
+            f.write(export_format)
+        
+        # Initialize empty results file
+        results_file = job_dir / "results.jsonl"
+        results_file.touch()
+    
     def save_scraped_data(self, job_id: str, data: Dict[str, Any]) -> None:
         """
-        Save scraped data to job directory
+        Save scraped data to job directory (always as JSONL for intermediate storage)
         """
         try:
             job_dir = self.get_job_dir(job_id)
             
-            # Append to results file
+            # Append to JSONL results file (intermediate format)
             results_file = job_dir / "results.jsonl"
             
-            with open(results_file, 'a') as f:
-                f.write(json.dumps(data) + '\n')
+            with open(results_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(data, ensure_ascii=False) + '\n')
             
             logger.info(f"Saved data for job {job_id}")
         
@@ -59,9 +74,22 @@ class StorageManager:
             logger.error(f"Error saving data for job {job_id}: {str(e)}")
             raise
     
-    def get_job_results(self, job_id: str, format: str = "json") -> Any:
+    def get_job_format(self, job_id: str) -> str:
+        """
+        Get the export format preference for a job
+        """
+        job_dir = self.get_job_dir(job_id)
+        format_file = job_dir / "format.txt"
+        
+        if format_file.exists():
+            with open(format_file, 'r') as f:
+                return f.read().strip()
+        return "json"  # Default
+    
+    def get_job_results(self, job_id: str, format: str = None) -> Any:
         """
         Retrieve job results in specified format
+        If format is None, use the job's preferred format
         """
         job_dir = self.get_job_dir(job_id)
         results_file = job_dir / "results.jsonl"
@@ -69,35 +97,63 @@ class StorageManager:
         if not results_file.exists():
             raise FileNotFoundError(f"No results found for job {job_id}")
         
+        # Use job's preferred format if not specified
+        if format is None:
+            format = self.get_job_format(job_id)
+        
+        # Check if final format already exists
         if format == "json":
-            # Read all lines and return as JSON array
-            results = []
-            with open(results_file, 'r') as f:
-                for line in f:
-                    if line.strip():
-                        results.append(json.loads(line))
+            final_file = job_dir / "results.json"
+            if final_file.exists():
+                with open(final_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            
+            # Generate from JSONL
+            results = self._read_jsonl(results_file)
+            
+            # Save as JSON for future use
+            with open(final_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            
             return results
         
         elif format == "csv":
-            # Convert to CSV
             csv_file = job_dir / "results.csv"
-            self._convert_to_csv(results_file, csv_file)
+            if not csv_file.exists():
+                self._convert_to_csv(results_file, csv_file)
             return str(csv_file)
+        
+        elif format == "zip":
+            zip_file = self.exports_dir / f"{job_id}.zip"
+            if not zip_file.exists():
+                zip_file = self.create_export_bundle(job_id)
+            return str(zip_file)
         
         else:
             raise ValueError(f"Unsupported format: {format}")
+    
+    def _read_jsonl(self, jsonl_file: Path) -> List[Dict[str, Any]]:
+        """
+        Read JSONL file and return as list of dictionaries
+        """
+        results = []
+        with open(jsonl_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    results.append(json.loads(line))
+        return results
     
     def _convert_to_csv(self, jsonl_file: Path, csv_file: Path) -> None:
         """
         Convert JSONL to CSV format
         """
-        results = []
-        with open(jsonl_file, 'r') as f:
-            for line in f:
-                if line.strip():
-                    results.append(json.loads(line))
+        results = self._read_jsonl(jsonl_file)
         
         if not results:
+            # Create empty CSV
+            with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['No data available'])
             return
         
         # Flatten nested data for CSV
@@ -124,7 +180,7 @@ class StorageManager:
         sep: str = '_'
     ) -> Dict[str, Any]:
         """
-        Flatten nested dictionary
+        Flatten nested dictionary for CSV export
         """
         items = []
         for k, v in d.items():
@@ -134,50 +190,61 @@ class StorageManager:
                 items.extend(self._flatten_dict(v, new_key, sep=sep).items())
             elif isinstance(v, list):
                 # Convert lists to JSON strings
-                items.append((new_key, json.dumps(v)))
+                items.append((new_key, json.dumps(v, ensure_ascii=False)))
             else:
                 items.append((new_key, v))
         
         return dict(items)
     
-    def export_results(self, job_id: str, format: str) -> Path:
+    def finalize_export(self, job_id: str) -> Path:
         """
-        Export job results to specified format
+        Finalize export in the user's requested format
+        This is called after scraping completes
         """
         try:
+            format = self.get_job_format(job_id)
             job_dir = self.get_job_dir(job_id)
-            export_dir = self.exports_dir / job_id
-            export_dir.mkdir(exist_ok=True)
+            results_file = job_dir / "results.jsonl"
+            
+            if not results_file.exists() or results_file.stat().st_size == 0:
+                logger.warning(f"No results to export for job {job_id}")
+                return None
             
             if format == "json":
-                # Copy results to export directory
-                src = job_dir / "results.jsonl"
-                dst = export_dir / "results.json"
+                # Convert JSONL to JSON
+                json_file = job_dir / "results.json"
+                results = self._read_jsonl(results_file)
                 
-                # Convert JSONL to JSON array
-                results = []
-                with open(src, 'r') as f:
-                    for line in f:
-                        if line.strip():
-                            results.append(json.loads(line))
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
                 
-                with open(dst, 'w') as f:
-                    json.dump(results, f, indent=2)
-                
-                return dst
+                logger.info(f"Exported {len(results)} items to JSON for job {job_id}")
+                return json_file
             
             elif format == "csv":
-                src = job_dir / "results.jsonl"
-                dst = export_dir / "results.csv"
-                self._convert_to_csv(src, dst)
-                return dst
+                # Convert JSONL to CSV
+                csv_file = job_dir / "results.csv"
+                self._convert_to_csv(results_file, csv_file)
+                
+                logger.info(f"Exported to CSV for job {job_id}")
+                return csv_file
             
             elif format == "zip":
-                return self.create_export_bundle(job_id)
-        
+                # Create ZIP bundle
+                zip_file = self.create_export_bundle(job_id)
+                
+                logger.info(f"Created ZIP bundle for job {job_id}")
+                return zip_file
+            
         except Exception as e:
-            logger.error(f"Error exporting results for job {job_id}: {str(e)}")
+            logger.error(f"Error finalizing export for job {job_id}: {str(e)}")
             raise
+    
+    def export_results(self, job_id: str, format: str) -> Path:
+        """
+        Export job results to specified format (legacy method, kept for compatibility)
+        """
+        return self.finalize_export(job_id)
     
     def create_export_bundle(self, job_id: str) -> Path:
         """
@@ -186,10 +253,26 @@ class StorageManager:
         job_dir = self.get_job_dir(job_id)
         zip_path = self.exports_dir / f"{job_id}.zip"
         
+        # First, ensure JSON and CSV versions exist
+        results_file = job_dir / "results.jsonl"
+        
+        if results_file.exists():
+            # Create JSON version
+            json_file = job_dir / "results.json"
+            if not json_file.exists():
+                results = self._read_jsonl(results_file)
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+            
+            # Create CSV version
+            csv_file = job_dir / "results.csv"
+            if not csv_file.exists():
+                self._convert_to_csv(results_file, csv_file)
+        
+        # Create ZIP with all files
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Add all files from job directory
             for file_path in job_dir.rglob('*'):
-                if file_path.is_file():
+                if file_path.is_file() and file_path.name != 'format.txt':
                     arcname = file_path.relative_to(job_dir)
                     zipf.write(file_path, arcname)
         
@@ -211,17 +294,27 @@ class StorageManager:
             
             file_path = media_dir / filename
             
+            # Skip if already downloaded
+            if file_path.exists():
+                logger.info(f"Media already exists: {filename}")
+                return file_path
+            
             async with aiohttp.ClientSession() as session:
-                async with session.get(media_url) as response:
+                async with session.get(media_url, timeout=30) as response:
                     if response.status == 200:
+                        content = await response.read()
                         with open(file_path, 'wb') as f:
-                            f.write(await response.read())
+                            f.write(content)
                         
-                        logger.info(f"Downloaded media: {filename}")
+                        file_size = len(content) / (1024 * 1024)  # MB
+                        logger.info(f"Downloaded media: {filename} ({file_size:.2f} MB)")
                         return file_path
                     else:
-                        raise Exception(f"Failed to download: {response.status}")
+                        raise Exception(f"HTTP {response.status}: Failed to download")
         
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout downloading media: {filename}")
+            raise Exception("Download timeout after 30 seconds")
         except Exception as e:
             logger.error(f"Error downloading media {filename}: {str(e)}")
             raise
